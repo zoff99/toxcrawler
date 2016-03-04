@@ -1,4 +1,4 @@
-ToxCrawler is a [Tox](https://tox.chat) DHT crawler and soon to be stats generator. Work in progress.
+toxcrawler is a [Tox](https://tox.chat) DHT crawler and soon to be stats generator. Work in progress.
 
 ## Features
 - Crawls the DHT like a boss
