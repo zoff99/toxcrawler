@@ -64,9 +64,12 @@ int hex_string_to_bin(const char *hex_string, size_t hex_len, char *output, size
  * -The crawler's present working directory is treated as root.
  * -The date is the current day, and the unixtime is the current unixtime.
  * -If the current day's directory does not exist it is automatically created.
+ *
+ * Returns 0 on success.
+ * Returns -1 on failure.
  */
 #define BASE_LOG_PATH "../crawler_logs"
-void get_log_path(char *buf, size_t buf_len)
+int get_log_path(char *buf, size_t buf_len)
 {
     time_t tm = get_time();
 
@@ -77,12 +80,21 @@ void get_log_path(char *buf, size_t buf_len)
     snprintf(path, sizeof(path), "%s/%s/", BASE_LOG_PATH, tmstr);
 
     struct stat st;
+
+    if (stat(BASE_LOG_PATH, &st) == -1) {
+        if (mkdir(BASE_LOG_PATH, 0700) == -1) {
+            return -1;
+        }
+    }
+
     if (stat(path, &st) == -1) {
         if (mkdir(path, 0700) == -1) {
-            fprintf(stderr, "WARNING: failed to create log directory.\n");
+            return -1;
         }
     }
 
     snprintf(buf, buf_len, "%s/%llu.cwl", path, (long long unsigned) tm);
+
+    return 0;
 }
 

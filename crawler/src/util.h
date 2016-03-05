@@ -43,7 +43,10 @@ int hex_string_to_bin(const char *hex_string, size_t hex_len, char *output, size
  * The date is the current day, and the unixtime is the current unixtime.
  *
  * If the current day's directory does not exist it is automatically created.
+ *
+ * Returns 0 on success.
+ * Returns -1 on failure.
  */
-void get_log_path(char *buf, size_t buf_len);
+int get_log_path(char *buf, size_t buf_len);
 
 #endif  /* UTIL_H */

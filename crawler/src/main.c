@@ -63,7 +63,7 @@ typedef struct Crawler {
     uint32_t     num_nodes;
     uint32_t     nodes_list_size;
     uint32_t     send_ptr;    /* index of the oldest node that we haven't sent a getnodes request to */
-    time_t       last_new_node;   /* Last time we last received an unknown node */
+    time_t       last_new_node;   /* Last time we found an unknown node */
     time_t       last_getnodes_request;
 
     pthread_t      tid;
@@ -191,7 +191,6 @@ static size_t send_node_requests(Crawler *cwl)
     size_t count = 0;
     uint32_t i;
 
-    /* Send four random requests per node */
     for (i = cwl->send_ptr; count < MAX_GETNODES_REQUESTS && i < cwl->num_nodes; ++i) {
         for (size_t j = 0; j < NUM_RAND_GETNODE_REQUESTS; ++j) {
             int r = rand() % cwl->num_nodes;
@@ -262,7 +261,10 @@ Crawler *crawler_new(void)
 static int crawler_dump_log(Crawler *cwl)
 {
     char log_path[PATH_MAX];
-    get_log_path(log_path, sizeof(log_path));
+    if (get_log_path(log_path, sizeof(log_path)) == -1) {
+        fprintf(stderr, "crawler_dump_log() failed; could not create path\n");
+        return -1;
+    }
 
     FILE *fp = fopen(log_path, "w");
 
