@@ -194,9 +194,7 @@ class CrawlerStats(object):
             return
 
         country = gi.country_code_by_addr(ip)
-
-        if country not in obj:
-            obj.get(country, 1) + 1
+        obj[country] = obj.get(country, 0) + 1
 
     """
     Removes all IP entries from from obj's IP cache
