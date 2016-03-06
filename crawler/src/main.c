@@ -257,19 +257,22 @@ Crawler *crawler_new(void)
     return cwl;
 }
 
-/* Dumps crawler nodes list to log file. TODO: make this safer with temp-file/rename */
+#define TEMP_FILE_EXT ".tmp"
+
+/* Dumps crawler nodes list to log file. */
 static int crawler_dump_log(Crawler *cwl)
 {
     char log_path[PATH_MAX];
     if (get_log_path(log_path, sizeof(log_path)) == -1) {
-        fprintf(stderr, "crawler_dump_log() failed; could not create path\n");
         return -1;
     }
 
-    FILE *fp = fopen(log_path, "w");
+    char log_path_temp[strlen(log_path) + strlen(TEMP_FILE_EXT) + 1];
+    snprintf(log_path_temp, sizeof(log_path_temp), "%s%s", log_path, TEMP_FILE_EXT);
+
+    FILE *fp = fopen(log_path_temp, "w");
 
     if (fp == NULL) {
-        fprintf(stderr, "crawler_dump_log() failed; could not open file\n");
         return -1;
     }
 
@@ -280,6 +283,11 @@ static int crawler_dump_log(Crawler *cwl)
     UNLOCK;
 
     fclose(fp);
+
+    if (rename(log_path_temp, log_path) != 0) {
+        return -1;
+    }
+
     return 0;
 }
 
@@ -321,7 +329,9 @@ void *do_crawler_thread(void *data)
     UNLOCK;
 
     if (!interrupted) {
-        crawler_dump_log(cwl);
+        if (crawler_dump_log(cwl) == -1) {
+            fprintf(stderr, "crawler_dump_log() failed\n");
+        }
     }
 
     crawler_kill(cwl);
