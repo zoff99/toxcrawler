@@ -39,6 +39,8 @@ STATS_FULL_FILENAME = '../stats.json'
 # The json file we read from and write to which includes all IP caches
 STATS_FILENAME = '../raw.json'
 
+TEMP_FILE_EXT = '.tmp'
+
 # Smallest time unit (in Ms) for which to store stats
 TIMETICK_INTERVAL = 5
 
@@ -87,15 +89,14 @@ class CrawlerStats(object):
         log_dirs = next(os.walk(CRAWLER_LOGS_DIRECTORY))
 
         if len(log_dirs) < 2:
-            return
+            return []
 
         L = []
         base_dir = log_dirs[0]
         for date in log_dirs[1]:
             date_dir = base_dir + '/' + date
             for filename in os.listdir(date_dir):
-                ts = filename.split('.cwl')[0]
-                if filename[-4:] == '.cwl' and int(ts) > lastUpdate:
+                if filename[-4:] == '.cwl' and int(filename[:-4]) > lastUpdate:
                     L.append(date_dir + '/' + filename)
 
         return L
@@ -197,13 +198,13 @@ class CrawlerStats(object):
         obj[country] = obj.get(country, 0) + 1
 
     """
-    Removes all IP entries from from obj's IP cache
+    Removes all IP entries from from obj's IP caches
     """
     def removeIPs(self, obj):
         for key in obj:
             if key == 'IPs':
                 obj['IPs'] = {}
-            if isinstance(obj[key], dict):
+            elif isinstance(obj[key], dict):
                 self.removeIPs(obj[key])   # I wonder if this sweet recursion will work forever
 
 
@@ -214,14 +215,17 @@ if __name__ == '__main__':
     stats = CrawlerStats()
 
     print "Generating " + STATS_FULL_FILENAME
-    outfile = open(STATS_FULL_FILENAME, 'w')
+    outfile = open(STATS_FULL_FILENAME + TEMP_FILE_EXT, 'w')
     jsonNoIps = stats.getJsonNoIPs()
     outfile.write(jsonNoIps)
 
     print "Generating " + STATS_FILENAME
-    outfile = open(STATS_FILENAME, 'w')
+    outfile = open(STATS_FILENAME + TEMP_FILE_EXT, 'w')
     json = stats.getJson()
     outfile.write(json)
+
+    os.rename(STATS_FULL_FILENAME + TEMP_FILE_EXT, STATS_FULL_FILENAME)
+    os.rename(STATS_FILENAME + TEMP_FILE_EXT, STATS_FILENAME)
 
     end = time.time()
 
