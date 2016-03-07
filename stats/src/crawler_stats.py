@@ -45,7 +45,7 @@ TEMP_FILE_EXT = '.tmp'
 TIMETICK_INTERVAL = 5
 
 """
-Returns the closest timetick to M, rounded down. e.g. lowestTimeTick(11) == 10, lowestTimeTick(19) == 15
+Returns the closest timetick to minute, rounded down. e.g. lowestTimeTick(11) == 10, lowestTimeTick(19) == 15
 """
 def lowestTimeTick(minute):
     return minute - (minute % TIMETICK_INTERVAL)
@@ -83,7 +83,8 @@ class CrawlerStats(object):
         self.jsonNoIPs = json.dumps(self.statsObj)
 
     """
-    Puts all log files with a more recent timetsamp than lastUpdate in self.logs
+    Returns a list containing all files from the logs directory
+    with a more recent timetsamp than lastUpdate.
     """
     def getLogDirectories(self, lastUpdate):
         log_dirs = next(os.walk(CRAWLER_LOGS_DIRECTORY))
@@ -93,6 +94,7 @@ class CrawlerStats(object):
 
         L = []
         base_dir = log_dirs[0]
+
         for date in log_dirs[1]:
             date_dir = base_dir + '/' + date
             for filename in os.listdir(date_dir):
@@ -191,11 +193,12 @@ class CrawlerStats(object):
     Increments the country counter in obj for given ip address
     """
     def incrementCountry(self, ip, obj):
-        if (not ip) or (ip[0] == '['):    # pygeoip doesn't support ipv6
-            return
-
         country = gi.country_code_by_addr(ip)
-        obj[country] = obj.get(country, 0) + 1
+
+        if country:
+            obj[country] = obj.get(country, 0) + 1
+        else:
+            obj['Unknown'] = obj.get('Unknown', 0) + 1
 
     """
     Removes all IP entries from from obj's IP caches
