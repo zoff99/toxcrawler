@@ -23,7 +23,6 @@
 import os
 import json
 import urllib
-import copy
 import time
 from datetime import datetime
 
@@ -41,8 +40,11 @@ STATS_FILENAME = '../raw.json'
 
 TEMP_FILE_EXT = '.tmp'
 
-# Smallest time unit (in Ms) for which to store stats
+# Smallest time unit (in minutes) for which to store stats
 TIMETICK_INTERVAL = 5
+
+# Key for unknown geolocations
+UNKNOWN_COUNTRY = 'Unknown'
 
 """
 Returns the closest timetick to minute, rounded down. e.g. lowestTimeTick(11) == 10, lowestTimeTick(19) == 15
@@ -132,7 +134,8 @@ class CrawlerStats(object):
         for file in logs:
             ts = int(file[max((file.rfind('/'), 0)) + 1 : file.rfind('.')])  # extract timestamp from path
             Y, m, d, H, M = datetime.fromtimestamp(ts).strftime("%Y-%m-%d-%H-%M").split('-')
-            tick = str(lowestTimeTick(int(M)))
+            tick = "%02d" % lowestTimeTick(int(M))
+
             IPlist, numIPs = self.getIPList(file)
 
             if numIPs < 100:
@@ -149,6 +152,8 @@ class CrawlerStats(object):
             if ts <= lastUpdate:
                 continue
 
+            newTick = True
+
             if Y not in statsObj:
                 statsObj[Y] = {"nodes": 0, "geo": {}, "IPs": {}}
             if m not in statsObj[Y]:
@@ -159,6 +164,8 @@ class CrawlerStats(object):
                 statsObj[Y][m][d][H] = {"nodes": 0, "geo": {}, "IPs": {}}
             if tick not in statsObj[Y][m][d][H]:
                 statsObj[Y][m][d][H][tick] = {"nodes": 0, "geo": {}}
+            else:
+                newTick = False
 
             # average results for all minutes in a given timetick interval
             n = statsObj[Y][m][d][H][tick]['nodes']
@@ -169,7 +176,9 @@ class CrawlerStats(object):
                 self.doIPStats(ip, statsObj[Y][m])
                 self.doIPStats(ip, statsObj[Y][m][d])
                 self.doIPStats(ip, statsObj[Y][m][d][H])
-                self.incrementCountry(ip, statsObj[Y][m][d][H][tick]['geo'])
+
+                if newTick:
+                    self.incrementCountry(ip, statsObj[Y][m][d][H][tick]['geo'])
 
         return statsObj
 
@@ -190,15 +199,14 @@ class CrawlerStats(object):
             self.incrementCountry(ip, obj['geo'])
 
     """
-    Increments the country counter in obj for given ip address
+    Increments the country counter in obj for given ip address.
     """
     def incrementCountry(self, ip, obj):
         country = gi.country_code_by_addr(ip)
+        if not country:
+            country = UNKNOWN_COUNTRY
 
-        if country:
-            obj[country] = obj.get(country, 0) + 1
-        else:
-            obj['Unknown'] = obj.get('Unknown', 0) + 1
+        obj[country] = obj.get(country, 0) + 1
 
     """
     Removes all IP entries from from obj's IP caches
