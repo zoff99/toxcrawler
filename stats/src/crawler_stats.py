@@ -44,7 +44,7 @@ TEMP_FILE_EXT = '.tmp'
 TIMETICK_INTERVAL = 5
 
 # Key for unknown geolocations
-UNKNOWN_COUNTRY = 'Unknown'
+UNKNOWN_COUNTRY = '??'
 
 """
 Returns the closest timetick to minute, rounded down. e.g. lowestTimeTick(11) == 10, lowestTimeTick(19) == 15
