@@ -35,7 +35,7 @@
 #include "util.h"
 
 /* Seconds to wait between new crawler instances */
-#define NEW_CRAWLER_INTERVAL 120
+#define NEW_CRAWLER_INTERVAL 180
 
 /* Maximum number of concurrent crawler instances */
 #define MAX_CRAWLERS 6

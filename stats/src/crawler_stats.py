@@ -24,6 +24,7 @@ import os
 import json
 import urllib
 import time
+from sys import argv
 from datetime import datetime
 
 import GeoIP
@@ -53,10 +54,10 @@ def lowestTimeTick(minute):
     return minute - (minute % TIMETICK_INTERVAL)
 
 class CrawlerStats(object):
-    def __init__(self):
+    def __init__(self, do_cleanup=False):
         self.json = None
         self.jsonNoIPs = None
-        self.statsObj = self.generateStats()
+        self.statsObj = self.generateStats(do_cleanup)
 
     """
     getJson() and getJsonNoIPs() return json representations of the stats object,
@@ -107,9 +108,12 @@ class CrawlerStats(object):
 
     """
     Creates an object containing statistics retreived from crawler logs.
+    If cleanup is set to True, this function will delete superfluous logs from
+    the crawler_logs directory, meaning only one log file per TIMETICK_INTERVAL is retained.
     """
-    def generateStats(self):
+    def generateStats(self, do_cleanup=False):
         statsObj = {}
+        cleanup = []
 
         # Try to load json file from disk if it exists,
         try:
@@ -163,9 +167,11 @@ class CrawlerStats(object):
             if H not in statsObj[Y][m][d]:
                 statsObj[Y][m][d][H] = {"nodes": 0, "geo": {}, "IPs": {}}
             if tick not in statsObj[Y][m][d][H]:
-                statsObj[Y][m][d][H][tick] = {"nodes": 0, "geo": {}}
+                statsObj[Y][m][d][H][tick] = {"nodes": numIPs, "geo": {}}
             else:
                 newTick = False
+                if do_cleanup:
+                    cleanup.append(file)
 
             # average results for all minutes in a given timetick interval
             n = statsObj[Y][m][d][H][tick]['nodes']
@@ -179,6 +185,9 @@ class CrawlerStats(object):
 
                 if newTick:
                     self.incrementCountry(ip, statsObj[Y][m][d][H][tick]['geo'])
+
+        for file in cleanup:
+            os.remove(file)
 
         return statsObj
 
@@ -223,7 +232,7 @@ if __name__ == '__main__':
     start = time.time()
 
     print "Collecting stats..."
-    stats = CrawlerStats()
+    stats = CrawlerStats(True) if (len(argv) > 1 and argv[1].lower() == 'cleanup') else CrawlerStats()
 
     print "Generating " + STATS_FULL_FILENAME
     outfile = open(STATS_FULL_FILENAME + TEMP_FILE_EXT, 'w')
