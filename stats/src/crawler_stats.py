@@ -24,6 +24,7 @@ import os
 import json
 import urllib
 import time
+import pytz
 from sys import argv
 from datetime import datetime
 
@@ -137,7 +138,7 @@ class CrawlerStats(object):
 
         for file in logs:
             ts = int(file[max((file.rfind('/'), 0)) + 1 : file.rfind('.')])  # extract timestamp from path
-            Y, m, d, H, M = datetime.fromtimestamp(ts).strftime("%Y-%m-%d-%H-%M").split('-')
+            Y, m, d, H, M = datetime.fromtimestamp(ts, tz=pytz.utc).strftime("%Y %m %d %H %M").split()
             tick = "%02d" % lowestTimeTick(int(M))
 
             IPlist, numIPs = self.getIPList(file)
