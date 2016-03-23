@@ -25,7 +25,7 @@ import json
 import urllib
 import time
 import pytz
-from sys import argv
+from sys import argv, exit
 from datetime import datetime
 
 import GeoIP
@@ -54,37 +54,22 @@ Returns the closest timetick to minute, rounded down. e.g. lowestTimeTick(11) ==
 def lowestTimeTick(minute):
     return minute - (minute % TIMETICK_INTERVAL)
 
+"""
+Removes all IP entries from from obj's IP caches
+"""
+def removeIPs(obj):
+    for key in obj:
+        if key == 'IPs':
+            obj['IPs'] = {}
+        elif isinstance(obj[key], dict):
+            removeIPs(obj[key])   # I wonder if this sweet recursion will work forever
+
 class CrawlerStats(object):
     def __init__(self, do_cleanup=False):
-        self.json = None
-        self.jsonNoIPs = None
         self.statsObj = self.generateStats(do_cleanup)
 
-    """
-    getJson() and getJsonNoIPs() return json representations of the stats object,
-    the former with IP caches intact and the latter without.
-
-    WARNING: These functions call generateJson() which deletes all IP caches from the statsObj.
-    """
-    def getJson(self):
-        if not self.json:
-            self.generateJson()
-
-        return self.json
-
-    def getJsonNoIPs(self):
-        if not self.jsonNoIPs:
-            self.generateJson()
-
-        return self.jsonNoIPs
-
-    """
-    Generates two json objects, one with IP caches and one without.
-    """
-    def generateJson(self):
-        self.json = json.dumps(self.statsObj)
-        self.removeIPs(self.statsObj)
-        self.jsonNoIPs = json.dumps(self.statsObj)
+    def getStatsObj(self):
+        return self.statsObj
 
     """
     Returns a list containing all files from the logs directory
@@ -218,42 +203,28 @@ class CrawlerStats(object):
 
         obj[country] = obj.get(country, 0) + 1
 
-    """
-    Removes all IP entries from from obj's IP caches
-    """
-    def removeIPs(self, obj):
-        for key in obj:
-            if key == 'IPs':
-                obj['IPs'] = {}
-            elif isinstance(obj[key], dict):
-                self.removeIPs(obj[key])   # I wonder if this sweet recursion will work forever
-
-
 if __name__ == '__main__':
     start = time.time()
 
     print "Collecting stats..."
     stats = CrawlerStats(True) if (len(argv) > 1 and argv[1].lower() == 'cleanup') else CrawlerStats()
 
-    print "Generating " + STATS_FULL_FILENAME
-    jsonNoIps = stats.getJsonNoIPs()
-    if not jsonNoIps:
-        print "No stats found..."
-        sys.exit(1)
+    statsObj = stats.getStatsObj()
 
-    outfile = open(STATS_FULL_FILENAME + TEMP_FILE_EXT, 'w')
-    outfile.write(jsonNoIps)
-    os.rename(STATS_FULL_FILENAME + TEMP_FILE_EXT, STATS_FULL_FILENAME)
+    if not statsObj:
+        print "Empty stats object"
+        exit(1)
 
-    print "Generating " + STATS_FILENAME
-    json = stats.getJson()
-    if not json:
-        print "Failed to generate raw json object"
-        sys.exit(1)
-
-    outfile = open(STATS_FILENAME + TEMP_FILE_EXT, 'w')
-    outfile.write(json)
+    # Dump full data including IP addresses to raw json object
+    fp1 = open(STATS_FILENAME + TEMP_FILE_EXT, 'w')
+    fp1.write(json.dumps(statsObj))
     os.rename(STATS_FILENAME + TEMP_FILE_EXT, STATS_FILENAME)
+
+    # Dump data without IP addresses
+    removeIPs(statsObj)
+    fp2 = open(STATS_FULL_FILENAME + TEMP_FILE_EXT, 'w')
+    fp2.write(json.dumps(statsObj))
+    os.rename(STATS_FULL_FILENAME + TEMP_FILE_EXT, STATS_FULL_FILENAME)
 
     end = time.time()
 
