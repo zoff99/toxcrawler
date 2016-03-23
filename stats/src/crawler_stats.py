@@ -236,16 +236,23 @@ if __name__ == '__main__':
     stats = CrawlerStats(True) if (len(argv) > 1 and argv[1].lower() == 'cleanup') else CrawlerStats()
 
     print "Generating " + STATS_FULL_FILENAME
-    outfile = open(STATS_FULL_FILENAME + TEMP_FILE_EXT, 'w')
     jsonNoIps = stats.getJsonNoIPs()
+    if not jsonNoIps:
+        print "No stats found..."
+        sys.exit(1)
+
+    outfile = open(STATS_FULL_FILENAME + TEMP_FILE_EXT, 'w')
     outfile.write(jsonNoIps)
+    os.rename(STATS_FULL_FILENAME + TEMP_FILE_EXT, STATS_FULL_FILENAME)
 
     print "Generating " + STATS_FILENAME
-    outfile = open(STATS_FILENAME + TEMP_FILE_EXT, 'w')
     json = stats.getJson()
-    outfile.write(json)
+    if not json:
+        print "Failed to generate raw json object"
+        sys.exit(1)
 
-    os.rename(STATS_FULL_FILENAME + TEMP_FILE_EXT, STATS_FULL_FILENAME)
+    outfile = open(STATS_FILENAME + TEMP_FILE_EXT, 'w')
+    outfile.write(json)
     os.rename(STATS_FILENAME + TEMP_FILE_EXT, STATS_FILENAME)
 
     end = time.time()

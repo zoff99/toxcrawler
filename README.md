@@ -45,5 +45,6 @@ You need:
 - Python >= 2.7
 - pip
 - GeoIP
+- pytz
 
 For debian-based systems, run the command `sudo apt-get install python-dev libgeoip-dev && pip install GeoIP`
