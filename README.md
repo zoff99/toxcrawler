@@ -11,7 +11,7 @@ Clone this repo to the same base directory as toxcore, then run the command `mak
 ## Stats Generator
 `crawler_stats.py`, which resides in the `stats/src/` directory, takes all of the log files in `crawler_logs/*`, collects statistics on them, and outputs the results in JSON format in the `stats/` directory. Two JSON files are created: `stats.json` and `raw.json`. The latter should be ignored.
 
-Collected stats include the number of total unique IP's, as well as the number of unique IP's for a specified country, for any given time period, from a year down to any 5 minute interval. 
+Collected stats include the number of total unique IP's, as well as the number of unique IP's for a specified country, for any given time period, from a year down to any 5 minute interval.
 
 Examples in python:
 ```python
@@ -34,10 +34,14 @@ print jsonObj['2016']['03']['geo']['CA']
 print jsonObj['2016']['03']['05']['21']['45']['geo']['US']
 
 # prints timestamp since the last update
-print jsonObj['lastUpdate']
+print jsonObj['miscStats']['lastUpdate']
 
-#prints timestamp of the oldest entry
-print jsonObj['oldestEntry']
+#prints timestamp of the oldest entry (i.e. when records begin)
+print jsonObj['miscStats']['oldestEntry']
+
+#prints timestamp of the record for most online nodes ever at a given time
+print jsonObj['miscStats']['mostOnlineRecord']
+
 ```
 
 ### Dependencies and Install
@@ -47,4 +51,4 @@ You need:
 - GeoIP
 - pytz
 
-For debian-based systems, run the command `sudo apt-get install python-dev libgeoip-dev && pip install GeoIP`
+For debian-based systems, run the command `sudo apt-get install python-dev libgeoip-dev && pip install GeoIP pytz`

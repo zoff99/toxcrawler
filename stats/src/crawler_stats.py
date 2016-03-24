@@ -98,7 +98,7 @@ class CrawlerStats(object):
     the crawler_logs directory, meaning only one log file per TIMETICK_INTERVAL is retained.
     """
     def generateStats(self, do_cleanup=False):
-        statsObj = {}
+        statsObj = { 'miscStats': {'lastUpdate': 0, 'oldestEntry': 99999999999, 'mostOnlineRecord': [0, 0]} }
         cleanup = []
 
         # Try to load json file from disk if it exists,
@@ -111,14 +111,8 @@ class CrawlerStats(object):
         except IOError:
             pass
 
-        lastUpdate, mostRecent, oldest = 0, 0, 99999999999
-
-        if 'lastUpdate' in statsObj:
-            lastUpdate = statsObj['lastUpdate']
-
-        if 'oldestEntry' in statsObj:
-            oldest = statsObj['oldestEntry']
-
+        miscStatsObj = statsObj['miscStats']
+        lastUpdate = miscStatsObj['lastUpdate']
         logs = self.getLogDirectories(lastUpdate)
 
         for file in logs:
@@ -131,16 +125,18 @@ class CrawlerStats(object):
             if numIPs < 100:
                 continue
 
-            if ts < oldest:
-                oldest = ts
-                statsObj['oldestEntry'] = ts
+            if ts < miscStatsObj['oldestEntry']:
+                miscStatsObj['oldestEntry'] = ts
 
-            if ts > mostRecent:
-                mostRecent = ts
-                statsObj['lastUpdate'] = ts
+            if ts > miscStatsObj['lastUpdate']:
+                miscStatsObj['lastUpdate'] = ts
 
             if ts <= lastUpdate:
                 continue
+
+            if numIPs > miscStatsObj['mostOnlineRecord'][1]:
+                miscStatsObj['mostOnlineRecord'][0] = ts
+                miscStatsObj['mostOnlineRecord'][1] = numIPs
 
             newTick = True
 
