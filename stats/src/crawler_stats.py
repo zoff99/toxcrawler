@@ -114,12 +114,20 @@ class CrawlerStats(object):
         miscStatsObj = statsObj['miscStats']
         lastUpdate = miscStatsObj['lastUpdate']
         logs = self.getLogDirectories(lastUpdate)
+        last_tick = ""
 
         for file in logs:
             ts = int(file[max((file.rfind('/'), 0)) + 1 : file.rfind('.')])  # extract timestamp from path
             Y, m, d, H, M = datetime.fromtimestamp(ts, tz=pytz.utc).strftime("%Y %m %d %H %M").split()
             tick = "%02d" % lowestTimeTick(int(M))
 
+            sameTick = tick == last_tick
+            if do_cleanup and sameTick:
+                cleanup.append(file)
+                last_tick = tick
+                continue
+
+            last_tick = tick
             IPlist, numIPs = self.getIPList(file)
 
             if numIPs < 100:
@@ -152,8 +160,6 @@ class CrawlerStats(object):
                 statsObj[Y][m][d][H][tick] = {"nodes": numIPs, "geo": {}}
             else:
                 newTick = False
-                if do_cleanup:
-                    cleanup.append(file)
 
             # average results for all minutes in a given timetick interval
             n = statsObj[Y][m][d][H][tick]['nodes']
