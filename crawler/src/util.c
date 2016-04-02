@@ -24,7 +24,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
-#include <stdint.h>
 #include <sys/stat.h>
 
 /* Returns the current unix time. */
@@ -43,7 +42,7 @@ bool timed_out(time_t timestamp, time_t timeout)
 void get_time_format(char *buf, int bufsize)
 {
     struct tm *timeinfo;
-    uint64_t t = get_time();
+    time_t t = get_time();
     timeinfo = localtime((const time_t*) &t);
     strftime(buf, bufsize, "%H:%M:%S", timeinfo);
 }
