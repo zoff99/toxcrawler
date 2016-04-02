@@ -30,6 +30,9 @@ time_t get_time(void);
 /* Returns true if timestamp has timed out according to timeout value. */
 bool timed_out(time_t timestamp, time_t timeout);
 
+/* Puts the current time in buf in the format of [HH:mm:ss] */
+void get_time_format(char *buf, int bufsize);
+
 /*
  * Converts a hexidecimal string of length hex_len to binary format and puts the result in output.
  * output_size must be exactly half of hex_len.

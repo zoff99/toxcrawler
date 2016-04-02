@@ -174,8 +174,6 @@ void cb_getnodes_response(IP_Port *ip_port, const uint8_t *public_key, void *obj
     memcpy(&cwl->nodes_list[cwl->num_nodes++], &node, sizeof(Node_format));
 
     cwl->last_new_node = get_time();
-
-  //  fprintf(stderr, "Nodes: %llu\n", cwl->num_nodes);
 }
 
 /*
@@ -273,7 +271,7 @@ static int crawler_dump_log(Crawler *cwl)
     FILE *fp = fopen(log_path_temp, "w");
 
     if (fp == NULL) {
-        return -1;
+        return -2;
     }
 
     LOCK;   // ip_ntoa() isn't thread safe
@@ -285,7 +283,7 @@ static int crawler_dump_log(Crawler *cwl)
     fclose(fp);
 
     if (rename(log_path_temp, log_path) != 0) {
-        return -1;
+        return -3;
     }
 
     return 0;
@@ -321,7 +319,9 @@ void *do_crawler_thread(void *data)
         usleep(tox_iteration_interval(cwl->tox) * 1000);
     }
 
-    fprintf(stderr, "Nodes found: %llu\n", (unsigned long long) cwl->num_nodes);
+    char time_format[128];
+    get_time_format(time_format, sizeof(time_format));
+    fprintf(stderr, "[%s] Nodes: %llu\n", time_format, (unsigned long long) cwl->num_nodes);
 
     LOCK;
     --threads.num_active;
@@ -329,8 +329,10 @@ void *do_crawler_thread(void *data)
     UNLOCK;
 
     if (!interrupted) {
-        if (crawler_dump_log(cwl) == -1) {
-            fprintf(stderr, "crawler_dump_log() failed\n");
+        int ret = crawler_dump_log(cwl);
+
+        if (ret == -1) {
+            fprintf(stderr, "crawler_dump_log() failed with error %d\n", ret);
         }
     }
 
