@@ -50,10 +50,10 @@
 #define GETNODES_REQUEST_INTERVAL 1
 
 /* Max number of nodes to send getnodes requests to per GETNODES_REQUEST_INTERVAL */
-#define MAX_GETNODES_REQUESTS 4
+#define MAX_GETNODES_REQUESTS 20
 
 /* Number of random node requests to make for each node we send a request to */
-#define NUM_RAND_GETNODE_REQUESTS 32
+#define NUM_RAND_GETNODE_REQUESTS 12
 
 
 typedef struct Crawler {
@@ -172,7 +172,6 @@ void cb_getnodes_response(IP_Port *ip_port, const uint8_t *public_key, void *obj
     memcpy(&node.ip_port, ip_port, sizeof(IP_Port));
     memcpy(node.public_key, public_key, TOX_PUBLIC_KEY_SIZE);
     memcpy(&cwl->nodes_list[cwl->num_nodes++], &node, sizeof(Node_format));
-
     cwl->last_new_node = get_time();
 }
 
@@ -190,6 +189,10 @@ static size_t send_node_requests(Crawler *cwl)
     uint32_t i;
 
     for (i = cwl->send_ptr; count < MAX_GETNODES_REQUESTS && i < cwl->num_nodes; ++i) {
+        DHT_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
+                     cwl->nodes_list[i].public_key,
+                     cwl->nodes_list[i].public_key);
+
         for (size_t j = 0; j < NUM_RAND_GETNODE_REQUESTS; ++j) {
             int r = rand() % cwl->num_nodes;
 

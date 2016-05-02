@@ -11,5 +11,6 @@
 *.swp
 *.orig
 crawler/crawler
+crawler_logs
 *.cwl
 *.json
