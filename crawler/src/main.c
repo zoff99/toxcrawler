@@ -50,10 +50,10 @@
 #define GETNODES_REQUEST_INTERVAL 1
 
 /* Max number of nodes to send getnodes requests to per GETNODES_REQUEST_INTERVAL */
-#define MAX_GETNODES_REQUESTS 20
+#define MAX_GETNODES_REQUESTS 5
 
 /* Number of random node requests to make for each node we send a request to */
-#define NUM_RAND_GETNODE_REQUESTS 12
+#define NUM_RAND_GETNODE_REQUESTS 32
 
 
 typedef struct Crawler {
