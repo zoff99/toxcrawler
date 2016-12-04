@@ -376,26 +376,33 @@ static int init_crawler_thread(Crawler *cwl)
     return 0;
 }
 
-static void do_thread_control(void)
+/*
+ * Creates new crawler instances.
+ *
+ * Returns 0 on success or if new instance is not needed.
+ * Returns -1 if crawler instance fails to initialize.
+ * Returns -2 if thread fails to initialize.
+ */
+static int do_thread_control(void)
 {
     LOCK;
     if (threads.num_active >= MAX_CRAWLERS || !timed_out(threads.last_created, NEW_CRAWLER_INTERVAL)) {
         UNLOCK;
-        return;
+        return 0;
     }
     UNLOCK;
 
     Crawler *cwl = crawler_new();
 
     if (cwl == NULL) {
-        return;
+        return -1;
     }
 
     int ret = init_crawler_thread(cwl);
 
     if (ret != 0) {
         fprintf(stderr, "init_crawler_thread() failed with error: %d\n", ret);
-        return;
+        return -2;
     }
 
     threads.last_created = get_time();
@@ -403,6 +410,8 @@ static void do_thread_control(void)
     LOCK;
     ++threads.num_active;
     UNLOCK;
+
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -422,8 +431,14 @@ int main(int argc, char **argv)
         }
         UNLOCK;
 
-        do_thread_control();
-        usleep(10000);
+        int ret = do_thread_control();
+
+        if (ret < 0) {
+            fprintf(stderr, "do_thread_control() failed with error %d\n", ret);
+            sleep(5);
+        } else {
+            usleep(10000);
+        }
     }
 
     /* Wait for threads to exit cleanly */
