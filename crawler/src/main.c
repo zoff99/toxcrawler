@@ -280,7 +280,9 @@ static int crawler_dump_log(Crawler *cwl)
 
     LOCK;   // ip_ntoa() isn't thread safe
     for (uint32_t i = 0; i < cwl->num_nodes; ++i) {
-        fprintf(fp, "%s ", ip_ntoa(&cwl->nodes_list[i].ip_port.ip));
+        char ip_str[IP_NTOA_LEN];
+        ip_ntoa(&cwl->nodes_list[i].ip_port.ip, ip_str, sizeof(ip_str));
+        fprintf(fp, "%s ", ip_str);
     }
     UNLOCK;
 
@@ -319,7 +321,7 @@ void *do_crawler_thread(void *data)
     Crawler *cwl = (Crawler *) data;
 
     while (!crawler_finished(cwl)) {
-        tox_iterate(cwl->tox);
+        tox_iterate(cwl->tox, NULL);
         send_node_requests(cwl);
         usleep(tox_iteration_interval(cwl->tox) * 1000);
     }
