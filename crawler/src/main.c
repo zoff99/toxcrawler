@@ -50,10 +50,10 @@
 #define GETNODES_REQUEST_INTERVAL 1
 
 /* Max number of nodes to send getnodes requests to per GETNODES_REQUEST_INTERVAL */
-#define MAX_GETNODES_REQUESTS 5
+#define MAX_GETNODES_REQUESTS 4
 
 /* Number of random node requests to make for each node we send a request to */
-#define NUM_RAND_GETNODE_REQUESTS 32
+#define NUM_RAND_GETNODE_REQUESTS 16
 
 
 typedef struct Crawler {
@@ -82,8 +82,6 @@ struct Threads {
 } threads;
 
 
-#define NUM_BOOTSTRAP_NODES 14
-#define NUM_BOOTSTRAPS 4
 static struct toxNodes {
     const char *ip;
     uint16_t    port;
@@ -93,36 +91,35 @@ static struct toxNodes {
     { "130.133.110.14",  33445, "461FA3776EF0FA655F1A05477DF1B3B614F7D6B124F7DB1DD4FE3C08B03B640F" },
     { "205.185.116.116", 33445, "A179B09749AC826FF01F37A9613F6B57118AE014D4196A0E1105A98F93A54702" },
     { "51.254.84.212",   33445, "AEC204B9A4501412D5F0BB67D9C81B5DB3EE6ADA64122D32A3E9B093D544327D" },
-    { "5.135.59.163",    33445, "2D320F971EF2CA18004416C2AAE7BA52BF7949DB34EA8E2E21AF67BD367BE211" },
+    { "185.14.30.213",   443,   "2555763C8C460495B14157D234DD56B86300A2395554BCAE4621AC345B8C1B1B" },
     { "194.249.212.109", 33445, "3CEE1F054081E7A011234883BC4FC39F661A55B73637A5AC293DDF1251D9432B" },
-    { "92.54.84.70",     33445, "5625A62618CB4FCA70E147A71B29695F38CC65FF0CBD68AD46254585BE564802" },
     { "5.189.176.217",   5190,  "2B2137E094F743AC8BD44652C55F41DFACC502F125E99E4FE24D40537489E32F" },
     { "136.243.141.187", 443,   "6EE1FADE9F55CC7938234CC07C864081FC606D8FE7B751EDA217F268F1078A39" },
     { "144.217.86.39",   33445, "7E5668E0EE09E19F320AD47902419331FFEE147BB3606769CFBE921A2A2FD34C" },
     { "37.97.185.116",   5190,  "E59A0E71ADA20D35BD1B0957059D7EF7E7792B3D680AE25C6F4DBBA09114D165" },
     { "80.87.193.193",   33445, "B38255EE4B054924F6D79A5E6E5889EC94B6ADF6FE9906F97A3D01E3D083223A" },
-    { "185.14.30.213",   443,   "2555763C8C460495B14157D234DD56B86300A2395554BCAE4621AC345B8C1B1B" },
     { "37.48.122.22",    33445, "1B5A8AB25FFFB66620A531C4646B47F0F32B74C547B30AF8BD8266CA50A3AB59" },
     { "104.223.122.15",  33445, "0FB96EEBFB1650DDB52E70CF773DDFCABE25A95CC3BB50FC251082E4B63EF82A" },
+    { "37.187.122.30",   33445, "BEB71F97ED9C99C04B8489BB75579EB4DC6AB6F441B603D63533122F1858B51D" },
+    { "192.99.232.158",  33445, "7B6CB208C811DEA8782711CE0CAD456AAC0C7B165A0498A1AA7010D2F2EC996C" },
+    { "46.229.52.198",   33445, "813C8F4187833EF0655B10F7752141A352248462A567529A38B6BBF73E979307" },
     { NULL, 0, NULL },
 };
 
-/* Bootstraps to NUM_BOOTSTRAPS random nodes in the bootsrap nodes list. */
+/* Attempts to bootstrap to every listed bootstrap node */
 static void bootstrap_tox(Crawler *cwl)
 {
-    for (size_t i = 0; i < NUM_BOOTSTRAPS; ++i) {
-        int r = rand() % NUM_BOOTSTRAP_NODES;
-
+    for (size_t i = 0; bs_nodes[i].ip != NULL; ++i) {
         char bin_key[TOX_PUBLIC_KEY_SIZE];
-        if (hex_string_to_bin(bs_nodes[r].key, strlen(bs_nodes[r].key), bin_key, sizeof(bin_key)) == -1) {
+        if (hex_string_to_bin(bs_nodes[i].key, strlen(bs_nodes[i].key), bin_key, sizeof(bin_key)) == -1) {
             continue;
         }
 
         TOX_ERR_BOOTSTRAP err;
-        tox_bootstrap(cwl->tox, bs_nodes[r].ip, bs_nodes[r].port, (uint8_t *) bin_key, &err);
+        tox_bootstrap(cwl->tox, bs_nodes[i].ip, bs_nodes[i].port, (uint8_t *) bin_key, &err);
 
         if (err != TOX_ERR_BOOTSTRAP_OK) {
-            fprintf(stderr, "Failed to bootstrap DHT via: %s %d (error %d)\n", bs_nodes[r].ip, bs_nodes[r].port, err);
+            fprintf(stderr, "Failed to bootstrap DHT via: %s %d (error %d)\n", bs_nodes[i].ip, bs_nodes[i].port, err);
         }
     }
 }
