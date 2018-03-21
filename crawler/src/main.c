@@ -53,7 +53,7 @@
 #define MAX_GETNODES_REQUESTS 4
 
 /* Number of random node requests to make for each node we send a request to */
-#define NUM_RAND_GETNODE_REQUESTS 16
+#define NUM_RAND_GETNODE_REQUESTS 32
 
 
 typedef struct Crawler {
