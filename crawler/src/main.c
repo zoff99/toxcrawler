@@ -334,7 +334,7 @@ void *do_crawler_thread(void *data)
     if (!interrupted) {
         int ret = crawler_dump_log(cwl);
 
-        if (ret == -1) {
+        if (ret < 0) {
             fprintf(stderr, "crawler_dump_log() failed with error %d\n", ret);
         }
     }
