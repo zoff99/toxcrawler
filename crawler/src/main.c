@@ -27,6 +27,7 @@
 #include <time.h>
 #include <signal.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include <tox/tox.h>
 #include "../../../toxcore/toxcore/DHT.h"
@@ -185,14 +186,14 @@ static size_t send_node_requests(Crawler *cwl)
     uint32_t i;
 
     for (i = cwl->send_ptr; count < MAX_GETNODES_REQUESTS && i < cwl->num_nodes; ++i) {
-        DHT_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
+        dht_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
                      cwl->nodes_list[i].public_key,
                      cwl->nodes_list[i].public_key);
 
         for (size_t j = 0; j < NUM_RAND_GETNODE_REQUESTS; ++j) {
             int r = rand() % cwl->num_nodes;
 
-            DHT_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
+            dht_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
                          cwl->nodes_list[i].public_key,
                          cwl->nodes_list[r].public_key);
         }
@@ -238,7 +239,7 @@ Crawler *crawler_new(void)
         return NULL;
     }
 
-    Messenger *m = (Messenger *) tox;   // Casting fuckery so we can access the DHT object directly
+    Messenger *m = *(Messenger **) tox;   // Casting fuckery so we can access the DHT object directly
     cwl->dht = m->dht;
     cwl->tox = tox;
     cwl->nodes_list = nodes_list;
