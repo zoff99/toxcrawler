@@ -1,5 +1,5 @@
 # toxcrawler
-toxcrawler is a [Tox](https://tox.chat) DHT network crawler. See it in action at https://toxstats.com/.
+toxcrawler is a [Tox](https://tox.chat) DHT network crawler.
 
 ## Crawler
 The crawler crawls the DHT network with multiple concurrent instances, allowing for a steady stream of up-to-date data on the number of active DHT notes on the network at any given time. When a crawler instance completes its mission, a log file containing all space separated IP addresses that it found is created in the `crawler_logs/{currentdate}/` directory, with the name `{timestamp}.cwl`.
