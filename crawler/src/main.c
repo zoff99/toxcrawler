@@ -39,22 +39,25 @@
 #define NEW_CRAWLER_INTERVAL 180
 
 /* Maximum number of concurrent crawler instances */
-#define MAX_CRAWLERS 6
+#define MAX_CRAWLERS 4
 
-/* Number of seconds to wait for new nodes before a crawler times out and exits */
-#define CRAWLER_TIMEOUT 20
+/* The number of passes we make through the nodes list before giving up */
+#define MAX_NUM_PASSES 2
+
+/* Seconds to wait for new nodes before a crawler times out and exits once pass limit is reached */
+#define CRAWLER_TIMEOUT 10
 
 /* Default maximum number of nodes the nodes list can store */
 #define DEFAULT_NODES_LIST_SIZE 4096
 
 /* Seconds to wait between getnodes requests */
-#define GETNODES_REQUEST_INTERVAL 1
+#define GETNODES_REQUEST_INTERVAL 0
 
 /* Max number of nodes to send getnodes requests to per GETNODES_REQUEST_INTERVAL */
-#define MAX_GETNODES_REQUESTS 4
+#define MAX_GETNODES_REQUESTS 12
 
 /* Number of random node requests to make for each node we send a request to */
-#define NUM_RAND_GETNODE_REQUESTS 32
+#define NUM_RAND_GETNODE_REQUESTS 15
 
 
 typedef struct Crawler {
@@ -66,7 +69,7 @@ typedef struct Crawler {
     uint32_t     send_ptr;    /* index of the oldest node that we haven't sent a getnodes request to */
     time_t       last_new_node;   /* Last time we found an unknown node */
     time_t       last_getnodes_request;
-
+    size_t       passes;  /* How many times we've iterated the full nodes list */
     pthread_t      tid;
     pthread_attr_t attr;
 } Crawler;
@@ -82,26 +85,25 @@ struct Threads {
     pthread_mutex_t lock;
 } threads;
 
-
-static struct toxNodes {
+static const struct toxNodes {
     const char *ip;
     uint16_t    port;
     const char *key;
 } bs_nodes[] = {
-    { "51.254.84.212",   33445, "AEC204B9A4501412D5F0BB67D9C81B5DB3EE6ADA64122D32A3E9B093D544327D" },
-    { "185.14.30.213",   443,   "2555763C8C460495B14157D234DD56B86300A2395554BCAE4621AC345B8C1B1B" },
     { "144.217.86.39",   33445, "7E5668E0EE09E19F320AD47902419331FFEE147BB3606769CFBE921A2A2FD34C" },
-    { "37.48.122.22",    33445, "1B5A8AB25FFFB66620A531C4646B47F0F32B74C547B30AF8BD8266CA50A3AB59" },
     { "46.229.52.198",   33445, "813C8F4187833EF0655B10F7752141A352248462A567529A38B6BBF73E979307" },
     { "85.172.30.117",   33445, "8E7D0B859922EF569298B4D261A8CCB5FEA14FB91ED412A7603A585A25698832" },
-    { "163.172.136.118", 33445, "2C289F9F37C20D09DA83565588BF496FAB3764853FA38141817A72E3F18ACA0B" },
-    { "78.46.73.141",    33445, "02807CF4F8BB8FB390CC3794BDF1E8449E9A8392C5D3F2200019DA9F1E812E46" },
-    { "95.31.18.227",    33445, "257744DBF57BE3E117FE05D145B5F806089428D4DCE4E3D0D50616AA16D9417E" },
     { "198.199.98.108",  33445, "BEF0CFB37AF874BD17B9A8F9FE64C75521DB95A37D33C5BDB00E9CF58659C04F" },
-    { "52.53.185.100",   33445, "A04F5FE1D006871588C8EC163676458C1EC75B20B4A147433D271E1E85DAF839" },
-    { "116.196.77.132",  33445, "040326E850DDCB49B1B2D9E3E2789D425774E4C5D783A55C09A024D05D2A8A66" },
-    { "87.118.126.207",  33445, "0D303B1778CA102035DA01334E7B1855A45C3EFBC9A83B9D916FFDEBC6DD3B2E" },
-    { "81.169.136.229",  33445, "D031DAC44F00464D3C9636F9850BF0064BC37FEB55789A13B6F59052CAE8A958" },
+    { "81.169.136.229",  33445, "E0DB78116AC6500398DDBA2AEEF3220BB116384CAB714C5D1FCD61EA2B69D75E" },
+    { "46.101.197.175",  33445, "CD133B521159541FB1D326DE9850F5E56A6C724B5B8E5EB5CD8D950408E95707" },
+    { "209.59.144.175",  33445, "214B7FEA63227CAEC5BCBA87F7ABEEDB1A2FF6D18377DD86BF551B8E094D5F1E" },
+    { "188.225.9.167",   33445, "1911341A83E02503AB1FD6561BD64AF3A9D6C3F12B5FBB656976B2E678644A67" },
+    { "122.116.39.151",  33445, "5716530A10D362867C8E87EE1CD5362A233BAFBBA4CF47FA73B7CAD368BD5E6E" },
+    { "195.123.208.139", 33445, "534A589BA7427C631773D13083570F529238211893640C99D1507300F055FE73" },
+    { "139.162.110.188", 33445, "F76A11284547163889DDC89A7738CF271797BF5E5E220643E97AD3C7E7903D55" },
+    { "198.98.49.206",   33445, "28DB44A3CEEE69146469855DFFE5F54DA567F5D65E03EFB1D38BBAEFF2553255" },
+    { "172.105.109.31",  33445, "D46E97CF995DC1820B92B7D899E152A217D36ABE22730FEA4B6BF1BFC06C617C" },
+    { "91.146.66.26",    33445, "B5E7DAC610DBDE55F359C7F8690B294C8E4FCEC4385DE9525DBFA5523EAD9D53" },
     { NULL, 0, NULL },
 };
 
@@ -122,6 +124,8 @@ static void bootstrap_tox(Crawler *cwl)
         }
     }
 }
+
+#define MIN(x, y)((x) < (y) ? (x) : (y))
 
 static volatile bool FLAG_EXIT = false;
 static void catch_SIGINT(int sig)
@@ -165,6 +169,7 @@ void cb_getnodes_response(IP_Port *ip_port, const uint8_t *public_key, void *obj
         cwl->nodes_list_size *= 2;
     }
 
+    // fprintf(stderr, "Node %u\n", cwl->num_nodes + 1);
     Node_format node;
     memcpy(&node.ip_port, ip_port, sizeof(IP_Port));
     memcpy(node.public_key, public_key, TOX_PUBLIC_KEY_SIZE);
@@ -190,12 +195,18 @@ static size_t send_node_requests(Crawler *cwl)
                      cwl->nodes_list[i].public_key,
                      cwl->nodes_list[i].public_key);
 
-        for (size_t j = 0; j < NUM_RAND_GETNODE_REQUESTS; ++j) {
-            int r = rand() % cwl->num_nodes;
+        const size_t num_rand_requests = MIN(NUM_RAND_GETNODE_REQUESTS / 2, cwl->num_nodes);
+
+        for (size_t j = 0; j < num_rand_requests; ++j) {
+            const uint32_t r = rand() % cwl->num_nodes;
 
             dht_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
                          cwl->nodes_list[i].public_key,
                          cwl->nodes_list[r].public_key);
+
+            dht_getnodes(cwl->dht, &cwl->nodes_list[r].ip_port,
+                         cwl->nodes_list[r].public_key,
+                         cwl->nodes_list[i].public_key);
         }
 
         ++count;
@@ -203,6 +214,11 @@ static size_t send_node_requests(Crawler *cwl)
 
     cwl->send_ptr = i;
     cwl->last_getnodes_request = get_time();
+
+    if (cwl->send_ptr == cwl->num_nodes) {
+        ++cwl->passes;
+        cwl->send_ptr = 0;
+    }
 
     return count;
 }
@@ -219,7 +235,7 @@ Crawler *crawler_new(void)
         return cwl;
     }
 
-    Node_format *nodes_list = malloc(DEFAULT_NODES_LIST_SIZE * sizeof(Node_format));
+    Node_format *nodes_list = calloc(DEFAULT_NODES_LIST_SIZE, sizeof(Node_format));
 
     if (nodes_list == NULL) {
         free(cwl);
@@ -303,7 +319,7 @@ static void crawler_kill(Crawler *cwl)
 static bool crawler_finished(Crawler *cwl)
 {
     LOCK;
-    if (FLAG_EXIT || (cwl->send_ptr == cwl->num_nodes && timed_out(cwl->last_new_node, CRAWLER_TIMEOUT))) {
+    if (FLAG_EXIT || (cwl->passes >= MAX_NUM_PASSES && timed_out(cwl->last_new_node, CRAWLER_TIMEOUT))) {
         UNLOCK;
         return true;
     }
@@ -327,11 +343,11 @@ void *do_crawler_thread(void *data)
     fprintf(stderr, "[%s] Nodes: %llu\n", time_format, (unsigned long long) cwl->num_nodes);
 
     LOCK;
-    bool interrupted = FLAG_EXIT;
+    const bool interrupted = FLAG_EXIT;
     UNLOCK;
 
     if (!interrupted) {
-        int ret = crawler_dump_log(cwl);
+        const int ret = crawler_dump_log(cwl);
 
         if (ret < 0) {
             fprintf(stderr, "crawler_dump_log() failed with error %d\n", ret);
@@ -395,7 +411,7 @@ static int do_thread_control(void)
         return -1;
     }
 
-    int ret = init_crawler_thread(cwl);
+    const int ret = init_crawler_thread(cwl);
 
     if (ret != 0) {
         fprintf(stderr, "init_crawler_thread() failed with error: %d\n", ret);
@@ -428,7 +444,7 @@ int main(int argc, char **argv)
         }
         UNLOCK;
 
-        int ret = do_thread_control();
+        const int ret = do_thread_control();
 
         if (ret < 0) {
             fprintf(stderr, "do_thread_control() failed with error %d\n", ret);
