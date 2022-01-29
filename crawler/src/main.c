@@ -20,6 +20,7 @@
  *
 */
 
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,8 +31,7 @@
 #include <unistd.h>
 
 #include <tox/tox.h>
-#include "../../../toxcore/toxcore/DHT.h"
-#include "../../../toxcore/toxcore/Messenger.h"
+#include "../../../toxcore/toxcore/tox_private.h"
 
 #include "util.h"
 
@@ -59,11 +59,9 @@
 /* Number of random node requests to make for each node we send a request to */
 #define NUM_RAND_GETNODE_REQUESTS 15
 
-
 typedef struct Crawler {
-    Tox         *tox;
-    DHT         *dht;
-    Node_format *nodes_list;
+    Tox          *tox;
+    Tox_Dht_Node **nodes_list;
     uint32_t     num_nodes;
     uint32_t     nodes_list_size;
     uint32_t     send_ptr;    /* index of the oldest node that we haven't sent a getnodes request to */
@@ -142,7 +140,10 @@ static void catch_SIGINT(int sig)
 static bool node_crawled(Crawler *cwl, const uint8_t *public_key)
 {
     for (uint32_t i = 0; i < cwl->num_nodes; ++i) {
-        if (memcmp(public_key, cwl->nodes_list[i].public_key, TOX_PUBLIC_KEY_SIZE) == 0) {
+        uint8_t pk[TOX_DHT_NODE_PUBLIC_KEY_SIZE];
+        tox_dht_node_get_public_key(cwl->nodes_list[i], pk);
+
+        if (memcmp(pk, public_key, TOX_DHT_NODE_PUBLIC_KEY_SIZE) == 0) {
             return true;
         }
     }
@@ -150,18 +151,27 @@ static bool node_crawled(Crawler *cwl, const uint8_t *public_key)
     return false;
 }
 
-void cb_getnodes_response(IP_Port *ip_port, const uint8_t *public_key, void *object)
+void cb_getnodes_response(Tox *tox, Tox_Dht_Node *dht_node, void *user_data)
 {
-    Crawler *cwl = object;
+    Crawler *cwl = (Crawler *)user_data;
+
+    if (cwl == NULL) {
+        return;
+    }
+
+    uint8_t public_key[TOX_DHT_NODE_PUBLIC_KEY_SIZE];
+    tox_dht_node_get_public_key(dht_node, public_key);
 
     if (node_crawled(cwl, public_key)) {
+        tox_dht_node_free(dht_node);
         return;
     }
 
     if (cwl->num_nodes + 1 >= cwl->nodes_list_size) {
-        Node_format *tmp = realloc(cwl->nodes_list, cwl->nodes_list_size * 2 * sizeof(Node_format));
+        Tox_Dht_Node **tmp = realloc(cwl->nodes_list, cwl->nodes_list_size * 2 * sizeof(Tox_Dht_Node *));
 
         if (tmp == NULL) {
+            tox_dht_node_free(dht_node);
             return;
         }
 
@@ -169,12 +179,10 @@ void cb_getnodes_response(IP_Port *ip_port, const uint8_t *public_key, void *obj
         cwl->nodes_list_size *= 2;
     }
 
-    // fprintf(stderr, "Node %u\n", cwl->num_nodes + 1);
-    Node_format node;
-    memcpy(&node.ip_port, ip_port, sizeof(IP_Port));
-    memcpy(node.public_key, public_key, TOX_PUBLIC_KEY_SIZE);
-    memcpy(&cwl->nodes_list[cwl->num_nodes++], &node, sizeof(Node_format));
+    cwl->nodes_list[cwl->num_nodes++] = dht_node;
     cwl->last_new_node = get_time();
+
+    // fprintf(stderr, "Node %u: %s:%u\n", cwl->num_nodes, ip_str, port);
 }
 
 /*
@@ -191,22 +199,24 @@ static size_t send_node_requests(Crawler *cwl)
     uint32_t i;
 
     for (i = cwl->send_ptr; count < MAX_GETNODES_REQUESTS && i < cwl->num_nodes; ++i) {
-        dht_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
-                     cwl->nodes_list[i].public_key,
-                     cwl->nodes_list[i].public_key);
+        const Tox_Dht_Node *node = cwl->nodes_list[i];
+
+        uint8_t public_key[TOX_DHT_NODE_PUBLIC_KEY_SIZE];
+        tox_dht_node_get_public_key(node, public_key);
+
+        tox_dht_get_nodes(cwl->tox, node, public_key, NULL);
 
         const size_t num_rand_requests = MIN(NUM_RAND_GETNODE_REQUESTS / 2, cwl->num_nodes);
 
         for (size_t j = 0; j < num_rand_requests; ++j) {
             const uint32_t r = rand() % cwl->num_nodes;
+            const Tox_Dht_Node *rand_node = cwl->nodes_list[r];
 
-            dht_getnodes(cwl->dht, &cwl->nodes_list[i].ip_port,
-                         cwl->nodes_list[i].public_key,
-                         cwl->nodes_list[r].public_key);
+            uint8_t rand_public_key[TOX_DHT_NODE_PUBLIC_KEY_SIZE];
+            tox_dht_node_get_public_key(rand_node, rand_public_key);
 
-            dht_getnodes(cwl->dht, &cwl->nodes_list[r].ip_port,
-                         cwl->nodes_list[r].public_key,
-                         cwl->nodes_list[i].public_key);
+            tox_dht_get_nodes(cwl->tox, node, rand_public_key, NULL);
+            tox_dht_get_nodes(cwl->tox, rand_node, public_key, NULL);
         }
 
         ++count;
@@ -235,7 +245,7 @@ Crawler *crawler_new(void)
         return cwl;
     }
 
-    Node_format *nodes_list = calloc(DEFAULT_NODES_LIST_SIZE, sizeof(Node_format));
+    Tox_Dht_Node **nodes_list = calloc(DEFAULT_NODES_LIST_SIZE, sizeof(Tox_Dht_Node *));
 
     if (nodes_list == NULL) {
         free(cwl);
@@ -255,13 +265,11 @@ Crawler *crawler_new(void)
         return NULL;
     }
 
-    Messenger *m = *(Messenger **) tox;   // Casting fuckery so we can access the DHT object directly
-    cwl->dht = m->dht;
     cwl->tox = tox;
     cwl->nodes_list = nodes_list;
     cwl->nodes_list_size = DEFAULT_NODES_LIST_SIZE;
 
-    DHT_callback_getnodes_response(cwl->dht, cb_getnodes_response, cwl);
+    tox_callback_dht_get_nodes_response(tox, cb_getnodes_response);
 
     cwl->last_getnodes_request = get_time();
     cwl->last_new_node = get_time();
@@ -277,6 +285,7 @@ Crawler *crawler_new(void)
 static int crawler_dump_log(Crawler *cwl)
 {
     char log_path[PATH_MAX];
+
     if (get_log_path(log_path, sizeof(log_path)) == -1) {
         return -1;
     }
@@ -290,13 +299,13 @@ static int crawler_dump_log(Crawler *cwl)
         return -2;
     }
 
-    LOCK;   // ip_ntoa() isn't thread safe
     for (uint32_t i = 0; i < cwl->num_nodes; ++i) {
-        char ip_str[IP_NTOA_LEN];
-        ip_ntoa(&cwl->nodes_list[i].ip_port.ip, ip_str, sizeof(ip_str));
-        fprintf(fp, "%s ", ip_str);
+        char ip_str[TOX_DHT_NODE_IP_STRING_SIZE];
+
+        if (tox_dht_node_get_ip_string(cwl->nodes_list[i], ip_str, sizeof(ip_str)) > 0) {
+            fprintf(fp, "%s ", ip_str);
+        }
     }
-    UNLOCK;
 
     fclose(fp);
 
@@ -311,6 +320,11 @@ static void crawler_kill(Crawler *cwl)
 {
     pthread_attr_destroy(&cwl->attr);
     tox_kill(cwl->tox);
+
+    for (size_t i = 0; i < cwl->num_nodes; ++i) {
+        tox_dht_node_free(cwl->nodes_list[i]);
+    }
+
     free(cwl->nodes_list);
     free(cwl);
 }
@@ -333,7 +347,7 @@ void *do_crawler_thread(void *data)
     Crawler *cwl = (Crawler *) data;
 
     while (!crawler_finished(cwl)) {
-        tox_iterate(cwl->tox, NULL);
+        tox_iterate(cwl->tox, cwl);
         send_node_requests(cwl);
         usleep(tox_iteration_interval(cwl->tox) * 1000);
     }
