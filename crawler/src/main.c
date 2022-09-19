@@ -31,7 +31,8 @@
 #include <unistd.h>
 
 #include <tox/tox.h>
-#include "../../../toxcore/toxcore/tox_private.h"
+//#include "../../../toxcore/toxcore/tox_private.h"
+#include "tox_private.h"
 
 #include "util.h"
 
@@ -42,13 +43,13 @@
 #define MAX_CRAWLERS 4
 
 /* The number of passes we make through the nodes list before giving up */
-#define MAX_NUM_PASSES 2
+#define MAX_NUM_PASSES 3
 
 /* Seconds to wait for new nodes before a crawler times out and exits once pass limit is reached */
-#define CRAWLER_TIMEOUT 10
+#define CRAWLER_TIMEOUT 15
 
 /* Default maximum number of nodes the nodes list can store */
-#define DEFAULT_NODES_LIST_SIZE 4096
+#define DEFAULT_NODES_LIST_SIZE 131072
 
 /* Seconds to wait between getnodes requests */
 #define GETNODES_REQUEST_INTERVAL 0
@@ -125,6 +126,8 @@ static void bootstrap_tox(Crawler *cwl)
 
         if (err != TOX_ERR_BOOTSTRAP_OK) {
             fprintf(stderr, "Failed to bootstrap DHT via: %s %d (error %d)\n", bs_nodes[i].ip, bs_nodes[i].port, err);
+        } else {
+            fprintf(stderr, "OK: bootstraped DHT via: %s %d (error %d)\n", bs_nodes[i].ip, bs_nodes[i].port, err);
         }
     }
 }
@@ -194,7 +197,7 @@ void cb_getnodes_response(Tox *tox, const uint8_t *public_key, const char *ip, u
     cwl->nodes_list[cwl->num_nodes++] = new_node;
     cwl->last_new_node = get_time();
 
-    // fprintf(stderr, "Node %u: %s:%u\n", cwl->num_nodes, ip, port);
+    fprintf(stderr, "Node %u: %s:%u\n", cwl->num_nodes, ip, port);
 }
 
 /*
@@ -433,6 +436,8 @@ static int do_thread_control(void)
     if (ret != 0) {
         fprintf(stderr, "init_crawler_thread() failed with error: %d\n", ret);
         return -2;
+    } else {
+        fprintf(stderr, "init_crawler_thread() OK error: %d\n", ret);
     }
 
     threads.last_created = get_time();

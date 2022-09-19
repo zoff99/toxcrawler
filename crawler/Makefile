@@ -1,7 +1,7 @@
-LIBS = toxcore
-CFLAGS = -std=gnu99 -Wall -ggdb -fstack-protector-all -pthread
+LIBS = libtoxcore
+CFLAGS = -std=gnu99 -O3 -fPIC -Wall -ggdb $(shell pkg-config --cflags $(LIBS)) -fstack-protector-all -pthread
 OBJ = main.o util.o
-LDFLAGS = $(shell pkg-config --libs $(LIBS))
+LDFLAGS = -fPIC $(shell pkg-config --libs $(LIBS)) $(shell pkg-config --libs libsodium)
 SRC_DIR = ./src
 
 all: $(OBJ)
